@@ -80,8 +80,10 @@ int swap32(const int dw)
 std::string zero_padding(unsigned int number)
 {
 	if(number < 10)
-		return "00" + std::to_string(number);
+		return "000" + std::to_string(number);
 	else if(number < 100)
+		return "00" + std::to_string(number);
+	else if(number < 1000)
 		return "0" + std::to_string(number);
 	else
 		return std::to_string(number);
