@@ -46,6 +46,7 @@ ENVS
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <vector>
 
 struct Index;
@@ -77,7 +78,7 @@ int swap32(const int dw)
 #endif
 }
 
-std::string zero_padding(unsigned int number)
+std::string zero_padding(std::size_t number)
 {
 	if(number < 10)
 		return "000" + std::to_string(number);
@@ -91,16 +92,15 @@ std::string zero_padding(unsigned int number)
 
 int main(int argc, char* argv[])
 {
-	std::cout << "Wwise *.BNK File Extractor" << std::endl;
-	std::cout << "(c) CTPAX-X Team 2009-2010 - http://www.CTPAX-X.org" << std::endl;
-	std::cout << "(c) RAWR 2015 - http://www.rawr4firefall.com" << std::endl;
-	std::cout << std::endl;
+	std::cout << "Wwise *.BNK File Extractor\n";
+	std::cout << "(c) CTPAX-X Team 2009-2010 - http://www.CTPAX-X.org\n";
+	std::cout << "(c) RAWR 2015-2018 - https://rawr4firefall.com\n\n";
 
 	// Has no argument(s)
 	if((argc < 2) || (argc > 3))
 	{
-		std::cout << "Usage: bnkextr filename.bnk [/swap]" << std::endl;
-		std::cout << "/swap - swap byte order (use it for unpacking 'Army of Two')" << std::endl;
+		std::cout << "Usage: bnkextr filename.bnk [/swap]\n";
+		std::cout << "/swap - swap byte order (use it for unpacking 'Army of Two')\n";
 		return 0;
 	}
 
@@ -110,21 +110,21 @@ int main(int argc, char* argv[])
 	// Could not open BNK file
 	if(!bnkfile.is_open())
 	{
-		std::cout << "Can't open input file: " << argv[1] << std::endl;
+		std::cout << "Can't open input file: " << argv[1] << "\n";
 		return 0;
 	}
 
-	unsigned int data_pos = 0;
+	std::size_t data_pos = 0;
 	std::vector<Index> files;
 	Section content_section;
 	Index content_index;
 
 	while(bnkfile.read(reinterpret_cast<char*>(&content_section), sizeof(content_section)))
 	{
-		unsigned int section_pos = bnkfile.tellg();
+		std::size_t section_pos = bnkfile.tellg();
 
 		// Was the /swap command used?
-		if(argc > 3)
+		if(argc == 3)
 			content_section.size = swap32(content_section.size);
 
 		if(std::strncmp(content_section.sign, "DIDX", 4) == 0)
