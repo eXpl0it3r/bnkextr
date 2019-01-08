@@ -48,7 +48,7 @@ ENVS
 #include <iostream>
 #include <vector>
 #include <string>
-#include <stdint.h>
+#include <cstdint>
 
 struct Index;
 struct Section;
@@ -56,16 +56,16 @@ struct Section;
 #pragma pack(push, 1)
 struct Index
 {
-	int unknown;
-	int offset;
-	uint32_t size;
+	std::uint32_t unknown;
+	std::uint32_t offset;
+	std::uint32_t size;
 };
 
 #pragma pack(push, 1)
 struct Section
 {
 	char sign[4];
-	uint32_t size;
+	std::uint32_t size;
 };
 #pragma pack(pop)
 #pragma pack(pop)
