@@ -1,47 +1,5 @@
-/*
-https://rarewares.org/ogg-oggenc.php#oggenc-aotuv
-https://forum.xentax.com/viewtopic.php?f=17&t=3477
-https://wiki.xentax.com/index.php/Wwise_SoundBank_(*.bnk)
-
-.BNK Format specifications
-
-char {4} - header (BKHD) // BanK HeaDer
-uint32 {4} - size of BKHD
-uint32 {4} - unknown (version?)
-uint32 {4} - unknown
-uint32 {4} - unknown
-uint32 {4} - unknown
-byte {x} - zero padding (if any)
-
-char {4} - header (DIDX) // Data InDeX
-uint32 {4} - size of DIDX
-following by records 12 bytes each:
-	uint32 {4} - unknown
-	uint32 {4} - relative file offset from start of DATA, 16 bytes aligned
-	uint32 {4} - file size
-
-char {4} - header (DATA)
-uint32 {4} - size of DATA
-
-char {4} - header (HIRC) // ???
-uint32 {4} - size of HIRC
-
-char {4} - header (STID) // Sound Type ID
-uint32 {4} - size of STID
-uint32 {4} - Always 1?
-uint32 {4} - Always 1?
-uint32 {4} - unknown
-byte {1} - TID Length (TL)
-char {TL} - TID string (usually same as filename, but without extension)
-
-Init.bnk
-STMG
-HIRC
-FXPR
-ENVS
-*/
-
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -55,7 +13,7 @@ struct Section;
 #pragma pack(push, 1)
 struct Index
 {
-    std::uint32_t unknown;
+    std::uint32_t id;
     std::uint32_t offset;
     std::uint32_t size;
 };
@@ -78,113 +36,114 @@ int swap32(const uint32_t dw)
 #endif
 }
 
-std::string zero_padding(unsigned int number)
-{
-    if (number < 10)
-    {
-        return "000" + std::to_string(number);
-    }
-
-    if (number < 100)
-    {
-        return "00" + std::to_string(number);
-    }
-
-    if (number < 1000)
-    {
-        return "0" + std::to_string(number);
-    }
-
-    return std::to_string(number);
-}
-
-int main(int argc, char* argv[])
+int main(int argument_count, char* arguments[])
 {
     std::cout << "Wwise *.BNK File Extractor\n";
-    std::cout << "(c) CTPAX-X Team 2009-2010 - http://www.CTPAX-X.org\n";
-    std::cout << "(c) RAWR 2015-2018 - https://rawr4firefall.com\n\n";
+    std::cout << "(c) RAWR 2015-2021 - https://rawr4firefall.com\n\n";
 
     // Has no argument(s)
-    if ((argc < 2) || (argc > 3))
+    if (argument_count < 2)
     {
-        std::cout << "Usage: bnkextr filename.bnk [/swap]\n";
-        std::cout << "/swap - swap byte order (use it for unpacking 'Army of Two')\n";
+        std::cout << "Usage: bnkextr filename.bnk [/swap] [/nodir]\n";
+        std::cout << "\t/swap - swap byte order (use it for unpacking 'Army of Two')\n";
+        std::cout << "\t/nodir - create no additional directory for the *.wem files\n";
         return EXIT_SUCCESS;
     }
 
-    auto bnkfile = std::fstream{ argv[1], std::ios::binary | std::ios::in };
+    auto bnk_filename = std::filesystem::path{ std::string{ arguments[1] } };
+    auto swap_byte_order = (argument_count == 3 && std::strncmp(arguments[2], "/swap", 5U) == 0)
+        || (argument_count == 4 && std::strncmp(arguments[3], "/swap", 5U) == 0);
+    auto no_directory = (argument_count == 3 && std::strncmp(arguments[2], "/nodir", 5U) == 0)
+        || (argument_count == 4 && std::strncmp(arguments[3], "/nodir", 5U) == 0);
+
+    auto bnk_file = std::fstream{ bnk_filename, std::ios::binary | std::ios::in };
 
     // Could not open BNK file
-    if (!bnkfile.is_open())
+    if (!bnk_file.is_open())
     {
-        std::cout << "Can't open input file: " << argv[1] << "\n";
-        return EXIT_SUCCESS;
+        std::cout << "Can't open input file: " << bnk_filename << "\n";
+        return EXIT_FAILURE;
     }
 
-    auto data_pos = 0u;
+    auto data_offset = std::size_t{ 0U };
     auto files = std::vector<Index>{};
     auto content_section = Section{};
     auto content_index = Index{};
 
-    while (bnkfile.read(reinterpret_cast<char*>(&content_section), sizeof(content_section)))
+    while (bnk_file.read(reinterpret_cast<char*>(&content_section), sizeof(content_section)))
     {
-        std::size_t section_pos = bnkfile.tellg();
+        std::size_t section_pos = bnk_file.tellg();
 
-        // Was the /swap command used?
-        if (argc == 3)
+        if (swap_byte_order)
         {
             content_section.size = swap32(content_section.size);
         }
 
-        if (std::strncmp(content_section.sign, "DIDX", 4u) == 0)
+        if (std::strncmp(content_section.sign, "DIDX", 4U) == 0)
         {
-            // Read files
-            for (auto i = 0u; i < content_section.size; i += sizeof(content_index))
+            // Read file indices
+            for (auto i = 0U; i < content_section.size; i += sizeof(content_index))
             {
-                bnkfile.read(reinterpret_cast<char*>(&content_index), sizeof(content_index));
+                bnk_file.read(reinterpret_cast<char*>(&content_index), sizeof(content_index));
                 files.push_back(content_index);
             }
         }
-        else if (std::strncmp(content_section.sign, "STID", 4u) == 0)
+        else if (std::strncmp(content_section.sign, "STID", 4U) == 0)
         {
             // To be implemented
         }
-        else if (std::strncmp(content_section.sign, "DATA", 4u) == 0)
+        else if (std::strncmp(content_section.sign, "DATA", 4U) == 0)
         {
-            // Get DATA offset
-            data_pos = bnkfile.tellg();
+            data_offset = bnk_file.tellg();
         }
 
         // Seek to the end of the section
-        bnkfile.seekg(section_pos + content_section.size);
+        bnk_file.seekg(section_pos + content_section.size);
     }
 
     // Reset EOF
-    bnkfile.clear();
+    bnk_file.clear();
 
-    // Extract files
-    if (data_pos > 0u && !files.empty())
+    if (data_offset == 0U || files.empty())
     {
-        for (auto i = 0u; i < files.size(); ++i)
+        std::cout << "No WEM files discovered to be extracted\n";
+        return EXIT_SUCCESS;
+    }
+
+    std::cout << "Found " << files.size() << " WEM files\n";
+    std::cout << "Start extracting...\n";
+
+    auto wem_directory = bnk_filename.parent_path();
+
+    if (!no_directory)
+    {
+        auto directory_name = bnk_filename.filename().replace_extension("");
+        auto directory = bnk_filename.replace_filename(directory_name);
+        create_directory(directory);
+        wem_directory = directory;
+    }
+
+    for (auto& file : files)
+    {
+        auto wem_filename = wem_directory;
+        wem_filename = wem_filename.append(std::to_string(file.id)).replace_extension(".wem");
+        auto wem_file = std::fstream{ wem_filename, std::ios::out | std::ios::binary };
+
+        if (swap_byte_order)
         {
-            auto filename = zero_padding(i + 1u) + ".wem";
-            auto wemfile = std::fstream{ filename, std::ios::out | std::ios::binary };
+            file.size = swap32(file.size);
+            file.offset = swap32(file.offset);
+        }
 
-            // Was the /swap command used?
-            if (argc > 3)
-            {
-                files[i].size = swap32(files[i].size);
-                files[i].offset = swap32(files[i].offset);
-            }
+        if (wem_file.is_open())
+        {
+            auto data = std::vector<char>(file.size, 0U);
 
-            if (wemfile.is_open())
-            {
-                auto data = std::vector<char>(files[i].size, 0u);
-
-                bnkfile.seekg(data_pos + files[i].offset);
-                bnkfile.read(static_cast<char*>(data.data()), files[i].size);
-                wemfile.write(static_cast<char*>(data.data()), files[i].size);
-            }
+            bnk_file.seekg(data_offset + file.offset);
+            bnk_file.read(static_cast<char*>(data.data()), file.size);
+            wem_file.write(static_cast<char*>(data.data()), file.size);
         }
     }
+
+    std::cout << "Files were extracted to: " << wem_directory.string() << "\n";
 }
