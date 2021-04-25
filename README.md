@@ -33,3 +33,8 @@ cmake --build .
 ```
 g++ bnkextr.cpp -std=c++17 -static -O2 -s -o bnkextr.exe
 ```
+
+## License
+
+- `bnkextr.dpr` falls under the original copryright holders rights and is solely kept for archival purpose
+- `bnkextr.cpp` is available under 2 licenses: Public Domain or MIT -- choose whichever you prefer
