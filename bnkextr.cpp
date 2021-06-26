@@ -27,13 +27,27 @@ struct Section
 #pragma pack(pop)
 #pragma pack(pop)
 
-int swap32(const uint32_t dw)
+int Swap32(const uint32_t dword)
 {
 #ifdef __GNUC__
 	return __builtin_bswap32(dw);
 #elif _MSC_VER
-    return _byteswap_ulong(dw);
+    return _byteswap_ulong(dword);
 #endif
+}
+
+template<typename T>
+bool ReadStructure(std::fstream& file, T& structure)
+{
+    return static_cast<bool>(file.read(reinterpret_cast<char*>(&structure), sizeof(structure)));
+}
+
+std::filesystem::path CreateOutputDirectory(std::filesystem::path bnk_filename)
+{
+    const auto directory_name = bnk_filename.filename().replace_extension("");
+    auto directory = bnk_filename.replace_filename(directory_name);
+    create_directory(directory);
+    return directory;
 }
 
 int main(int argument_count, char* arguments[])
@@ -70,13 +84,13 @@ int main(int argument_count, char* arguments[])
     auto content_section = Section{};
     auto content_index = Index{};
 
-    while (bnk_file.read(reinterpret_cast<char*>(&content_section), sizeof(content_section)))
+    while (ReadStructure(bnk_file, content_section))
     {
         std::size_t section_pos = bnk_file.tellg();
 
         if (swap_byte_order)
         {
-            content_section.size = swap32(content_section.size);
+            content_section.size = Swap32(content_section.size);
         }
 
         if (std::strncmp(content_section.sign, "DIDX", 4U) == 0)
@@ -84,7 +98,7 @@ int main(int argument_count, char* arguments[])
             // Read file indices
             for (auto i = 0U; i < content_section.size; i += sizeof(content_index))
             {
-                bnk_file.read(reinterpret_cast<char*>(&content_index), sizeof(content_index));
+                ReadStructure(bnk_file, content_index);
                 files.push_back(content_index);
             }
         }
@@ -117,31 +131,28 @@ int main(int argument_count, char* arguments[])
 
     if (!no_directory)
     {
-        auto directory_name = bnk_filename.filename().replace_extension("");
-        auto directory = bnk_filename.replace_filename(directory_name);
-        create_directory(directory);
-        wem_directory = directory;
+        wem_directory = CreateOutputDirectory(bnk_filename);
     }
 
-    for (auto& file : files)
+    for (auto& [id, offset, size] : files)
     {
         auto wem_filename = wem_directory;
-        wem_filename = wem_filename.append(std::to_string(file.id)).replace_extension(".wem");
+        wem_filename = wem_filename.append(std::to_string(id)).replace_extension(".wem");
         auto wem_file = std::fstream{ wem_filename, std::ios::out | std::ios::binary };
 
         if (swap_byte_order)
         {
-            file.size = swap32(file.size);
-            file.offset = swap32(file.offset);
+            size = Swap32(size);
+            offset = Swap32(offset);
         }
 
         if (wem_file.is_open())
         {
-            auto data = std::vector<char>(file.size, 0U);
+            auto data = std::vector<char>(size, 0U);
 
-            bnk_file.seekg(data_offset + file.offset);
-            bnk_file.read(static_cast<char*>(data.data()), file.size);
-            wem_file.write(static_cast<char*>(data.data()), file.size);
+            bnk_file.seekg(data_offset + offset);
+            bnk_file.read(data.data(), size);
+            wem_file.write(data.data(), size);
         }
     }
 
