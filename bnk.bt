@@ -1,0 +1,392 @@
+struct BKHD
+{
+    uint version;
+    uint id;
+    byte unknown[sectionLength-8];
+};
+
+struct DIDX
+{
+    struct ENTRY
+    {
+        uint id;
+        uint offset;
+        uint length;
+    } entry[sectionLength / sizeof(ENTRY)];
+};
+
+struct DATA_Track(int size)
+{
+    byte data[size];
+};
+
+struct DATA
+{
+    local int i;
+    local int offset = 0;
+    for(i = 0; i < sizeof(didx.entry) / sizeof(ENTRY); i++)
+    {
+        FSkip(didx.entry[i].offset - offset); // Skip buffer/alignment region
+        DATA_Track track(didx.entry[i].length);
+        offset = didx.entry[i].length;
+    }    
+};
+
+enum <ubyte> HIRC_EntryType
+{
+    Settings = 1,
+    Sound = 2,
+    EventAction = 3,
+    Event = 4,
+    RandomOrSequenceContainer = 5,
+    SwitchContainer = 6,
+    ActorMixer = 7,
+    AudioBus = 8,
+    BlendContainer = 9,
+    MusicSegment = 10,
+    MusicTrack = 11,
+    MusicSwitchContainer = 12,
+    MusicPlaylistContainer = 13,
+    Attenuation = 14,
+    DialogueEvent = 15,
+    MotionBus = 16,
+    MotionFx = 17,
+    Effect = 18,
+    Unknown = 19,
+    AuxiliaryBus = 20
+};
+
+enum <uint> HIRC_Sound_StorageType
+{
+    Embedded = 0,
+    Streamed = 1,
+    StreamedPrefetched = 2
+};
+
+enum <ubyte> HIRC_Sound_SoundType
+{
+    SFX = 0,
+    Voice = 1
+};
+
+struct HIRC_UNK
+{
+    uint length;
+    byte data[length];
+};
+
+struct HIRC_Settings
+{
+    uint length;
+    byte data[length];
+};
+
+struct HIRC_Sound
+{
+    uint length;
+    uint id;
+    uint _unknown;
+    HIRC_Sound_StorageType state;
+    uint audioId;
+    uint sourceId;
+    HIRC_Sound_SoundType soundType;
+    byte data[length - 21];
+
+};
+
+enum <ubyte> HIRC_EventActionScope
+{
+    SwitchOrTrigger = 1,
+    Global = 2,
+    GameObject = 3,
+    State = 4,
+    All = 5,
+    AllExcept = 6
+};
+
+enum <ubyte> HIRC_EventActionType
+{
+    Stop = 1,
+    Pause = 2,
+    Resume = 3,
+    Play = 4,
+    Trigger = 5,
+    Mute = 6,
+    UnMute = 7,
+    SetVoicePitch = 8,
+    ResetVoicePitch = 9,
+    SetVpoceVolume = 10,
+    ResetVoiceVolume = 11,
+    SetBusVolume = 12,
+    ResetBusVolume = 13,
+    SetVoiceLowPassFilter = 14,
+    ResetVoiceLowPassFilter = 15,
+    EnableState = 16,
+    DisableState = 17,
+    SetState = 18,
+    SetGameParameter = 19,
+    ResetGameParameter = 20,
+    SetSwitch = 21,
+    ToggleBypass = 22,
+    ResetBypassEffect = 23,
+    Break = 24,
+    Seek = 25
+};
+
+enum <ubyte> HIRC_EventActionParameterType
+{
+    Delay = 0x0E,
+    ParamPlay = 0x0F,
+    Probability = 0x10
+};
+
+struct HIRC_EventAction
+{
+    uint length;
+    uint id;
+    HIRC_EventActionScope scope;
+    HIRC_EventActionType actionType;
+    uint gameObjectId;
+    byte _null<hidden=true>;
+    byte parameterCount;
+    HIRC_EventActionParameterType parameterTypes[parameterCount];
+    byte parameters[parameterCount];
+    byte _null<hidden=true>;
+    if (actionType == 12) // Set State
+    {
+        uint stateGroupId;
+        uint stateId;
+    }
+    else if (actionType == 19) // Set Switch
+    {
+        uint switchGroupId;
+        uint groupId;
+    }
+    else
+    {
+        byte _unknown[length - 13 - (sizeof(byte) * parameterCount * 2)];
+    }
+};
+
+struct HIRC_Event
+{
+    uint length;
+    uint id;
+    if (bankVersion >= 134)
+        byte actionCount;
+    else
+        uint actionCount;
+    uint actionIds[actionCount];
+};
+struct HIRC_RandomOrSequenceContainer
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_SwitchContainer
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_ActorMixer
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_AudioBus
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_BlendContainer
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_MusicSegment
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_MusicTrack
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_MusicSwitchContainer
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_MusicPlaylistContainer
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_Attenuation
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_DialogueEvent
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_MotionBus
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_MotionFx
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_Effect
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_Unknown
+{
+    uint length;
+    byte data[length];
+};
+struct HIRC_AuxiliaryBus
+{
+    uint length;
+    byte data[length];
+};
+
+struct HIRC
+{
+    local uint i = 0;
+    uint count;
+
+    for( i = 0; i < count; i++ )
+    {
+        HIRC_EntryType type<hidden=true>; 
+        switch(type)
+        {
+            case Settings:
+                HIRC_Settings entry<name="Settings">;
+                break;
+            case Sound:
+                HIRC_Sound entry<name="Sound">;
+                break;
+            case EventAction:
+                HIRC_EventAction entry<name="EventAction">;
+                break;
+            case Event:
+                HIRC_Event entry<name="Event">;
+                break;
+            case RandomOrSequenceContainer:
+                HIRC_RandomOrSequenceContainer entry<name="RandomOrSequenceContainer">;
+                break;
+            case SwitchContainer:
+                HIRC_SwitchContainer entry<name="SwitchContainer">;
+                break;
+            case ActorMixer:
+                HIRC_ActorMixer entry<name="ActorMixer">;
+                break;
+            case AudioBus:
+                HIRC_AudioBus entry<name="AudioBus">;
+                break;
+            case BlendContainer:
+                HIRC_BlendContainer entry<name="BlendContainer">;
+                break;
+            case MusicSegment:
+                HIRC_MusicSegment entry<name="MusicSegment">;
+                break;
+            case MusicTrack:
+                HIRC_MusicTrack entry<name="MusicTrack">;
+                break;
+            case MusicSwitchContainer:
+                HIRC_MusicSwitchContainer entry<name="MusicSwitchContainer">;
+                break;
+            case MusicPlaylistContainer:
+                HIRC_MusicPlaylistContainer entry<name="MusicPlaylistContainer">;
+                break;
+            case Attenuation:
+                HIRC_Attenuation entry<name="Attenuation">;
+                break;
+            case DialogueEvent:
+                HIRC_DialogueEvent entry<name="DialogueEvent">;
+                break;
+            case MotionBus:
+                HIRC_MotionBus entry<name="MotionBus">;
+                break;
+            case MotionFx:
+                HIRC_MotionFx entry<name="MotionFx">;
+                break;
+            case Effect:
+                HIRC_Effect entry<name="Effect">;
+                break;
+            case Unknown:
+                HIRC_Unknown entry<name="Unknown">;
+                break;
+            case AuxiliaryBus:
+                HIRC_AuxiliaryBus entry<name="AuxiliaryBus">;
+                break;
+            default:         
+                HIRC_UNK entry<name="UNKNOWN">;
+                break;
+        } 
+    }
+};
+
+struct STID_ENTRY
+{
+    uint id;
+    ubyte length;
+    char name[length];
+};
+
+struct STID
+{
+    uint one;
+    uint count;
+    STID_ENTRY entries[count]<optimize=false>;
+};
+
+struct UNK
+{
+    byte data[sectionLength];
+};
+
+
+local char magic[4];
+local uint sectionLength;
+local uint bankVersion;
+
+while(!FEof())
+{   
+    magic = ReadString(FTell(), 4);
+    FSkip(4);
+    sectionLength = ReadUInt();
+    FSkip(4);
+    
+    switch(magic)
+    {
+        case "BKHD":
+            BKHD bkhd;
+            bankVersion = bkhd.version;
+            break;
+        case "DIDX":
+            DIDX didx;
+            break;
+        case "DATA":
+            DATA data;
+            break;
+        case "HIRC":
+            HIRC hirc;
+            break;
+        case "STID":
+            STID stid;
+            break;
+        default:         
+            UNK unk;
+            break;
+    }   
+}

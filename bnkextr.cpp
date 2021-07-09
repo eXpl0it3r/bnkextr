@@ -70,8 +70,64 @@ struct Object
 
 struct EventObject
 {
-    std::uint32_t length;
+    std::uint32_t action_count;
     std::vector<std::uint32_t> action_ids;
+};
+
+enum class EventActionScope : char
+{
+    SwitchOrTrigger = 1,
+    Global = 2,
+    GameObject = 3,
+    State = 4,
+    All = 5,
+    AllExcept = 6
+};
+
+enum class EventActionType : char
+{
+    Stop = 1,
+    Pause = 2,
+    Resume = 3,
+    Play = 4,
+    Trigger = 5,
+    Mute = 6,
+    UnMute = 7,
+    SetVoicePitch = 8,
+    ResetVoicePitch = 9,
+    SetVpoceVolume = 10,
+    ResetVoiceVolume = 11,
+    SetBusVolume = 12,
+    ResetBusVolume = 13,
+    SetVoiceLowPassFilter = 14,
+    ResetVoiceLowPassFilter = 15,
+    EnableState = 16,
+    DisableState = 17,
+    SetState = 18,
+    SetGameParameter = 19,
+    ResetGameParameter = 20,
+    SetSwitch = 21,
+    ToggleBypass = 22,
+    ResetBypassEffect = 23,
+    Break = 24,
+    Seek = 25
+};
+
+enum class EventActionParameterType : char
+{
+    Delay = 0x0E,
+    Play = 0x0F,
+    Probability = 0x10
+};
+
+struct EventActionObject
+{
+    EventActionScope scope;
+    EventActionType action_type;
+    std::uint32_t game_object_id;
+    char parameter_count;
+    std::vector<EventActionParameterType> parameters_types;
+    std::vector<char> parameters;
 };
 
 int Swap32(const uint32_t dword)
@@ -151,6 +207,7 @@ int main(int argument_count, char* arguments[])
     auto bank_header = BankHeader{};
     auto objects = std::vector<Object>{};
     auto event_objects = std::map<std::uint32_t, EventObject>{};
+    auto event_action_objects = std::map<std::uint32_t, EventActionObject>{};
 
     while (ReadContent(bnk_file, content_section))
     {
@@ -204,16 +261,14 @@ int main(int argument_count, char* arguments[])
                     {
                         auto count = unsigned char{ 0 };
                         ReadContent(bnk_file, count);
-                        event.length = static_cast<std::size_t>(count);
+                        event.action_count = static_cast<std::size_t>(count);
                     }
                     else
                     {
-                        auto count = std::uint32_t{ 0 };
-                        ReadContent(bnk_file, count);
-                        event.length = count;
+                        ReadContent(bnk_file, event.action_count);
                     }
 
-                    for (auto j = 0U; j < event.length; ++j)
+                    for (auto j = 0U; j < event.action_count; ++j)
                     {
                         auto action_id = std::uint32_t{ 0 };
                         ReadContent(bnk_file, action_id);
@@ -221,6 +276,37 @@ int main(int argument_count, char* arguments[])
                     }
 
                     event_objects[object.id] = event;
+                }
+                else if (object.type == ObjectType::EventAction)
+                {
+                    auto event_action = EventActionObject{};
+
+                    ReadContent(bnk_file, event_action.scope);
+                    ReadContent(bnk_file, event_action.action_type);
+                    ReadContent(bnk_file, event_action.game_object_id);
+
+                    bnk_file.seekg(1, std::ios_base::cur);
+
+                    ReadContent(bnk_file, event_action.parameter_count);
+
+                    for (auto j = 0U; j < static_cast<std::size_t>(event_action.parameter_count); ++j)
+                    {
+                        auto parameter_type = EventActionParameterType{};
+                        ReadContent(bnk_file, parameter_type);
+                        event_action.parameters_types.push_back(parameter_type);
+                    }
+
+                    for (auto j = 0U; j < static_cast<std::size_t>(event_action.parameter_count); ++j)
+                    {
+                        auto parameter = char{ 0 };
+                        ReadContent(bnk_file, parameter);
+                        event_action.parameters.push_back(parameter);
+                    }
+
+                    bnk_file.seekg(1, std::ios_base::cur);
+                    bnk_file.seekg(object.size - 13 - event_action.parameter_count * 2, std::ios_base::cur);
+
+                    event_action_objects[object.id] = event_action;
                 }
 
                 bnk_file.seekg(object.size - sizeof(std::uint32_t), std::ios_base::cur);
@@ -259,16 +345,28 @@ int main(int argument_count, char* arguments[])
         {
             object_file << "Object ID: " << object.id << "\n";
 
-
             switch (object.type)
             {
             case ObjectType::Event:
                 object_file << "\tType: Event\n";
-                object_file << "\tNumber of Actions: " << event_objects[object.id].length << "\n";
+                object_file << "\tNumber of Actions: " << event_objects[object.id].action_count << "\n";
 
                 for (auto& action_id : event_objects[object.id].action_ids)
                 {
                     object_file << "\tAction ID: " << action_id << "\n";
+                }
+                break;
+            case ObjectType::EventAction:
+                object_file << "\tType: EventAction\n";
+                object_file << "\tAction Scope: " << static_cast<int>(event_action_objects[object.id].scope) << "\n";
+                object_file << "\tAction Type: " << static_cast<int>(event_action_objects[object.id].action_type) << "\n";
+                object_file << "\tGame Object ID: " << static_cast<int>(event_action_objects[object.id].game_object_id) << "\n";
+                object_file << "\tNumber of Parameters: " << static_cast<int>(event_action_objects[object.id].parameter_count) << "\n";
+
+                for (auto j = 0; j < event_action_objects[object.id].parameter_count; ++j)
+                {
+                    object_file << "\t\tParameter Type: " << static_cast<int>(event_action_objects[object.id].parameters_types[j]) << "\n";
+                    object_file << "\t\tParameter: " << static_cast<int>(event_action_objects[object.id].parameters[j]) << "\n";
                 }
                 break;
             default:
