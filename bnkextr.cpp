@@ -36,7 +36,7 @@ struct BankHeader
 };
 #pragma pack(pop)
 
-enum class ObjectType : char
+enum class ObjectType : std::int8_t
 {
     SoundEffectOrVoice = 2,
     EventAction = 3,
@@ -74,7 +74,7 @@ struct EventObject
     std::vector<std::uint32_t> action_ids;
 };
 
-enum class EventActionScope : char
+enum class EventActionScope : std::int8_t
 {
     SwitchOrTrigger = 1,
     Global = 2,
@@ -84,7 +84,7 @@ enum class EventActionScope : char
     AllExcept = 6
 };
 
-enum class EventActionType : char
+enum class EventActionType : std::int8_t
 {
     Stop = 1,
     Pause = 2,
@@ -113,7 +113,7 @@ enum class EventActionType : char
     Seek = 25
 };
 
-enum class EventActionParameterType : char
+enum class EventActionParameterType : std::int8_t
 {
     Delay = 0x0E,
     Play = 0x0F,
@@ -125,15 +125,15 @@ struct EventActionObject
     EventActionScope scope;
     EventActionType action_type;
     std::uint32_t game_object_id;
-    char parameter_count;
+    std::uint8_t parameter_count;
     std::vector<EventActionParameterType> parameters_types;
-    std::vector<char> parameters;
+    std::vector<std::int8_t> parameters;
 };
 
 int Swap32(const uint32_t dword)
 {
 #ifdef __GNUC__
-	return __builtin_bswap32(dw);
+	return __builtin_bswap32(dword);
 #elif _MSC_VER
     return _byteswap_ulong(dword);
 #endif
@@ -259,7 +259,7 @@ int main(int argument_count, char* arguments[])
 
                     if (bank_header.version >= 134)
                     {
-                        auto count = unsigned char{ 0 };
+                        auto count = std::uint8_t{ 0 };
                         ReadContent(bnk_file, count);
                         event.action_count = static_cast<std::size_t>(count);
                     }
@@ -298,7 +298,7 @@ int main(int argument_count, char* arguments[])
 
                     for (auto j = 0U; j < static_cast<std::size_t>(event_action.parameter_count); ++j)
                     {
-                        auto parameter = char{ 0 };
+                        auto parameter = std::int8_t{ 0 };
                         ReadContent(bnk_file, parameter);
                         event_action.parameters.push_back(parameter);
                     }
