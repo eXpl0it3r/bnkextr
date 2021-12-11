@@ -2,19 +2,22 @@ cmake_minimum_required(VERSION 3.15)
 
 project(bnkextr LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_executable(${PROJECT_NAME} "bnkextr.cpp")
 
-add_executable(bnkextr "bnkextr.cpp")
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
+set_target_properties(${PROJECT_NAME}
+    PROPERTIES
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+)
 
 # Static Runtime
-if(WIN32 AND MSVC)
-	set_property(TARGET bnkextr PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+	set_property(TARGET ${PROJECT_NAME} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 elseif((CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND NOT APPLE)
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+	target_link_options(${PROJECT_NAME} PRIVATE -static)
 endif()
 
 # Install executable
-install(TARGETS bnkextr
+install(TARGETS ${PROJECT_NAME}
 		RUNTIME DESTINATION .)

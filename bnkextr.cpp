@@ -139,7 +139,7 @@ int Swap32(const uint32_t dword)
 #endif
 }
 
-template<typename T>
+template <typename T>
 bool ReadContent(std::fstream& file, T& structure)
 {
     return static_cast<bool>(file.read(reinterpret_cast<char*>(&structure), sizeof(structure)));
@@ -160,7 +160,7 @@ bool Compare(char* char_string, const std::string& string)
 
 bool HasArgument(char* arguments[], const int argument_count, const std::string& argument)
 {
-    for(auto i = 0U; i < static_cast<std::size_t>(argument_count); ++i)
+    for (auto i = 0U; i < static_cast<std::size_t>(argument_count); ++i)
     {
         if (Compare(arguments[i], argument))
         {
@@ -261,7 +261,7 @@ int main(int argument_count, char* arguments[])
                     {
                         auto count = std::uint8_t{ 0 };
                         ReadContent(bnk_file, count);
-                        event.action_count = static_cast<std::size_t>(count);
+                        event.action_count = static_cast<std::uint32_t>(count);
                     }
                     else
                     {
@@ -338,39 +338,39 @@ int main(int argument_count, char* arguments[])
         if (!object_file.is_open())
         {
             std::cout << "Unable to write objects file '" << object_filename.string() << "'\n";
-            return -1;
+            return EXIT_FAILURE;
         }
 
-        for (auto& object : objects)
+        for (auto& [type, size, id] : objects)
         {
-            object_file << "Object ID: " << object.id << "\n";
+            object_file << "Object ID: " << id << "\n";
 
-            switch (object.type)
+            switch (type)
             {
             case ObjectType::Event:
                 object_file << "\tType: Event\n";
-                object_file << "\tNumber of Actions: " << event_objects[object.id].action_count << "\n";
+                object_file << "\tNumber of Actions: " << event_objects[id].action_count << "\n";
 
-                for (auto& action_id : event_objects[object.id].action_ids)
+                for (auto& action_id : event_objects[id].action_ids)
                 {
                     object_file << "\tAction ID: " << action_id << "\n";
                 }
                 break;
             case ObjectType::EventAction:
                 object_file << "\tType: EventAction\n";
-                object_file << "\tAction Scope: " << static_cast<int>(event_action_objects[object.id].scope) << "\n";
-                object_file << "\tAction Type: " << static_cast<int>(event_action_objects[object.id].action_type) << "\n";
-                object_file << "\tGame Object ID: " << static_cast<int>(event_action_objects[object.id].game_object_id) << "\n";
-                object_file << "\tNumber of Parameters: " << static_cast<int>(event_action_objects[object.id].parameter_count) << "\n";
+                object_file << "\tAction Scope: " << static_cast<int>(event_action_objects[id].scope) << "\n";
+                object_file << "\tAction Type: " << static_cast<int>(event_action_objects[id].action_type) << "\n";
+                object_file << "\tGame Object ID: " << static_cast<int>(event_action_objects[id].game_object_id) << "\n";
+                object_file << "\tNumber of Parameters: " << static_cast<int>(event_action_objects[id].parameter_count) << "\n";
 
-                for (auto j = 0; j < event_action_objects[object.id].parameter_count; ++j)
+                for (auto j = 0; j < event_action_objects[id].parameter_count; ++j)
                 {
-                    object_file << "\t\tParameter Type: " << static_cast<int>(event_action_objects[object.id].parameters_types[j]) << "\n";
-                    object_file << "\t\tParameter: " << static_cast<int>(event_action_objects[object.id].parameters[j]) << "\n";
+                    object_file << "\t\tParameter Type: " << static_cast<int>(event_action_objects[id].parameters_types[j]) << "\n";
+                    object_file << "\t\tParameter: " << static_cast<int>(event_action_objects[id].parameters[j]) << "\n";
                 }
                 break;
             default:
-                object_file << "\tType: " << static_cast<int>(object.type) << "\n";
+                object_file << "\tType: " << static_cast<int>(type) << "\n";
             }
         }
 
