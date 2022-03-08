@@ -95,7 +95,7 @@ enum class EventActionType : std::int8_t
     UnMute = 7,
     SetVoicePitch = 8,
     ResetVoicePitch = 9,
-    SetVpoceVolume = 10,
+    SetVoiceVolume = 10,
     ResetVoiceVolume = 11,
     SetBusVolume = 12,
     ResetBusVolume = 13,
@@ -174,7 +174,7 @@ bool HasArgument(char* arguments[], const int argument_count, const std::string&
 int main(int argument_count, char* arguments[])
 {
     std::cout << "Wwise *.BNK File Extractor\n";
-    std::cout << "(c) RAWR 2015-2021 - https://rawr4firefall.com\n\n";
+    std::cout << "(c) RAWR 2015-2022 - https://rawr4firefall.com\n\n";
 
     // Has no argument(s)
     if (argument_count < 2)

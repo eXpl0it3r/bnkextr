@@ -29,7 +29,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ## MIT License
 
-Copyright (c) 2015 - 2021 Lukas Dürrenberger
+Copyright (c) 2015 - 2022 Lukas Dürrenberger
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

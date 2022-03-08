@@ -11,11 +11,12 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-        - { name: Windows VS2017, os: windows-2016   }
-        - { name: Windows VS2019, os: windows-latest }
-        - { name: Linux GCC,      os: ubuntu-latest  }
+        - { name: Windows VS2017, os: windows-2016  }
+        - { name: Windows VS2019, os: windows-2019  }
+        - { name: Windows VS2022, os: windows-2022  }
+        - { name: Linux GCC,      os: ubuntu-latest }
         - { name: Linux Clang,    os: ubuntu-latest, flags: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ }
-        - { name: MacOS XCode,    os: macos-latest   }
+        - { name: MacOS XCode,    os: macos-latest  }
 
     steps:
     - name: Checkout Code

@@ -32,8 +32,8 @@ Usage: bnkextr filename.bnk [/swap] [/nodir] [/obj]
 ### CMake
 
 ```
-cmake .
-cmake --build .
+cmake -S . -B build/
+cmake --build build/ --target install
 ```
 
 ### GCC
