@@ -19,7 +19,7 @@ Usage: bnkextr filename.bnk [/swap] [/nodir] [/obj]
 - See the [original Delphi code](bnkextr.dpr) for the initial file specification
 - See the [XeNTaX wiki](https://wiki.xentax.com/index.php/Wwise_SoundBank_(*.bnk)) for a more complete file specification
 - See the [bnk.bt](bnk.bt) file for [010 Editor](https://www.sweetscape.com/010editor/) specification
-- See the [bnk.ksy](bnk.ksy) file for [Kaitai Struct](https://kaitai.io/) specification (slightly incomplete)
+- See the [bnk.ksy](https://github.com/WolvenKit/wwise-audio-tools/blob/feat/bnk-tools/ksy/bnk.ksy) file by ADawesomeguy for a [Kaitai Struct](https://kaitai.io/) specification
 
 ### Supported HIRC Events
 
