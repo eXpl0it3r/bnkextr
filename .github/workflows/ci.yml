@@ -13,8 +13,8 @@ jobs:
         platform:
         - { name: Windows VS2019, os: windows-2019 }
         - { name: Windows VS2022, os: windows-2022 }
-        - { name: Linux GCC,      os: ubuntu-22.04 }
-        - { name: Linux Clang,    os: ubuntu-22.04, flags: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ }
+        - { name: Linux GCC,      os: ubuntu-24.04 }
+        - { name: Linux Clang,    os: ubuntu-24.04, flags: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ }
         - { name: MacOS XCode,    os: macos-14 }
 
     steps:
