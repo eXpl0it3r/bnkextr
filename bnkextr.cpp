@@ -8,6 +8,7 @@
 #include <string>
 #include <cstdint>
 #include <map>
+#include <set>
 
 struct Index;
 struct Section;
@@ -131,6 +132,22 @@ struct EventActionObject
     std::vector<std::int8_t> parameters;
 };
 
+struct Options
+{
+    bool swap_byte_order;
+    bool no_directory;
+    bool dump_objects;
+};
+
+struct PackageEntry
+{
+    std::uint64_t id;
+    std::uint32_t block_size;
+    std::uint32_t size;
+    std::uint32_t start_block;
+    std::uint32_t language_id;
+};
+
 int Swap32(const uint32_t dword)
 {
 #ifdef __GNUC__
@@ -164,34 +181,11 @@ bool HasArgument(const std::vector<std::filesystem::path>& arguments, const std:
     return std::find(arguments.begin(), arguments.end(), argument) != arguments.end();
 }
 
-int Run(const std::vector<std::filesystem::path>& arguments)
+int ExtractBank(const std::filesystem::path& bnk_filename, std::fstream& bnk_file, const Options& options)
 {
-    std::cout << "Wwise *.BNK File Extractor\n";
-    std::cout << "(c) RAWR 2015-2022 - https://rawr4firefall.com\n\n";
-
-    // Has no argument(s)
-    if (arguments.size() < 2)
-    {
-        std::cout << "Usage: bnkextr filename.bnk [/swap] [/nodir] [/obj]\n";
-        std::cout << "\t/swap - swap byte order (use it for unpacking 'Army of Two')\n";
-        std::cout << "\t/nodir - create no additional directory for the *.wem files\n";
-        std::cout << "\t/obj - generate an objects.txt file with the extracted object data\n";
-        return EXIT_SUCCESS;
-    }
-
-    auto bnk_filename = arguments[1];
-    auto swap_byte_order = HasArgument(arguments, "/swap");
-    auto no_directory = HasArgument(arguments, "/nodir");
-    auto dump_objects = HasArgument(arguments, "/obj");
-
-    auto bnk_file = std::fstream{ bnk_filename, std::ios::binary | std::ios::in };
-
-    // Could not open BNK file
-    if (!bnk_file.is_open())
-    {
-        std::cout << "Can't open input file: " << bnk_filename.u8string() << "\n";
-        return EXIT_FAILURE;
-    }
+    const auto swap_byte_order = options.swap_byte_order;
+    const auto no_directory = options.no_directory;
+    const auto dump_objects = options.dump_objects;
 
     auto data_offset = std::size_t{ 0U };
     auto files = std::vector<Index>{};
@@ -407,6 +401,315 @@ int Run(const std::vector<std::filesystem::path>& arguments)
 
     std::cout << "Files were extracted to: " << output_directory.u8string() << "\n";
     return EXIT_SUCCESS;
+}
+
+std::uint32_t ReadUInt32(std::fstream& file, const bool swap_byte_order)
+{
+    auto value = std::uint32_t{ 0 };
+    ReadContent(file, value);
+    return swap_byte_order ? static_cast<std::uint32_t>(Swap32(value)) : value;
+}
+
+std::map<std::uint32_t, std::string> ReadPackageLanguages(std::fstream& file, const std::uint32_t map_size, const bool swap_byte_order)
+{
+    auto languages = std::map<std::uint32_t, std::string>{};
+    auto map = std::vector<char>(map_size, 0);
+    file.read(map.data(), map_size);
+
+    const auto read_value = [&](const std::size_t position)
+    {
+        auto value = std::uint32_t{ 0 };
+        std::memcpy(&value, map.data() + position, sizeof(value));
+        return swap_byte_order ? static_cast<std::uint32_t>(Swap32(value)) : value;
+    };
+
+    if (map_size < sizeof(std::uint32_t))
+    {
+        return languages;
+    }
+
+    const auto count = read_value(0);
+
+    for (auto i = std::size_t{ 0 }; i < count && (i + 1) * 8 + 4 <= map.size(); ++i)
+    {
+        const auto name_offset = read_value(4 + i * 8);
+        const auto id = read_value(8 + i * 8);
+
+        // The names are plain ASCII, either stored as 8-bit or as UTF-16 characters
+        const auto is_wide = name_offset + 1U < map.size() && (map[name_offset] == '\0' || map[name_offset + 1U] == '\0');
+        const auto step = std::size_t{ is_wide ? 2U : 1U };
+        auto position = std::size_t{ name_offset } + (is_wide && map[name_offset] == '\0' ? 1U : 0U);
+        auto name = std::string{};
+
+        for (; position < map.size() && map[position] != '\0'; position += step)
+        {
+            name += map[position];
+        }
+
+        languages[id] = name;
+    }
+
+    return languages;
+}
+
+bool ReadPackageEntries(std::fstream& file, const std::uint32_t table_size, const bool has_wide_ids, const bool swap_byte_order, std::vector<PackageEntry>& entries)
+{
+    const std::size_t table_end = static_cast<std::size_t>(file.tellg()) + table_size;
+    const auto entry_size = std::uint64_t{ has_wide_ids ? 24U : 20U };
+
+    if (table_size >= sizeof(std::uint32_t))
+    {
+        const auto count = ReadUInt32(file, swap_byte_order);
+
+        if (count * entry_size > table_size - sizeof(std::uint32_t))
+        {
+            return false;
+        }
+
+        for (auto i = 0U; i < count; ++i)
+        {
+            auto entry = PackageEntry{};
+
+            if (has_wide_ids)
+            {
+                const auto first = std::uint64_t{ ReadUInt32(file, swap_byte_order) };
+                const auto second = std::uint64_t{ ReadUInt32(file, swap_byte_order) };
+                entry.id = swap_byte_order ? (first << 32U | second) : (second << 32U | first);
+            }
+            else
+            {
+                entry.id = ReadUInt32(file, swap_byte_order);
+            }
+
+            entry.block_size = ReadUInt32(file, swap_byte_order);
+            entry.size = ReadUInt32(file, swap_byte_order);
+            entry.start_block = ReadUInt32(file, swap_byte_order);
+            entry.language_id = ReadUInt32(file, swap_byte_order);
+            entries.push_back(entry);
+        }
+    }
+
+    file.seekg(table_end);
+    return static_cast<bool>(file);
+}
+
+bool CopyContent(std::fstream& source, const std::uint64_t offset, std::uint64_t size, const std::filesystem::path& target_filename)
+{
+    auto target = std::fstream{ target_filename, std::ios::out | std::ios::binary };
+
+    if (!target.is_open())
+    {
+        return false;
+    }
+
+    auto buffer = std::vector<char>(1024U * 1024U, 0);
+    source.seekg(offset);
+
+    while (size > 0U && source)
+    {
+        const auto chunk = static_cast<std::streamsize>(std::min<std::uint64_t>(size, buffer.size()));
+        source.read(buffer.data(), chunk);
+        target.write(buffer.data(), source.gcount());
+        size -= static_cast<std::uint64_t>(chunk);
+    }
+
+    return size == 0U && source && target;
+}
+
+int ExtractPackage(const std::filesystem::path& pck_filename, std::fstream& pck_file, const Options& options)
+{
+    const auto swap_byte_order = options.swap_byte_order;
+
+    // Skip the AKPK signature
+    pck_file.seekg(4);
+
+    const auto header_size = ReadUInt32(pck_file, swap_byte_order);
+    const auto version = ReadUInt32(pck_file, swap_byte_order);
+    const auto languages_size = ReadUInt32(pck_file, swap_byte_order);
+    const auto banks_size = ReadUInt32(pck_file, swap_byte_order);
+    const auto streams_size = ReadUInt32(pck_file, swap_byte_order);
+    auto externals_size = std::uint32_t{ 0 };
+
+    // Older packages don't have a table for external files
+    const auto tables_size = std::uint64_t{ languages_size } + banks_size + streams_size;
+
+    if (header_size != tables_size + 16U)
+    {
+        externals_size = ReadUInt32(pck_file, swap_byte_order);
+
+        if (header_size != tables_size + externals_size + 20U)
+        {
+            std::cout << "Unknown or encrypted package, the header doesn't add up\n";
+            return EXIT_FAILURE;
+        }
+    }
+
+    std::cout << "Wwise Package Version: " << version << "\n";
+
+    auto languages = ReadPackageLanguages(pck_file, languages_size, swap_byte_order);
+    auto banks = std::vector<PackageEntry>{};
+    auto streams = std::vector<PackageEntry>{};
+    auto externals = std::vector<PackageEntry>{};
+
+    if (!ReadPackageEntries(pck_file, banks_size, false, swap_byte_order, banks)
+        || !ReadPackageEntries(pck_file, streams_size, false, swap_byte_order, streams)
+        || !ReadPackageEntries(pck_file, externals_size, true, swap_byte_order, externals))
+    {
+        std::cout << "Unknown or encrypted package, the file tables can't be read\n";
+        return EXIT_FAILURE;
+    }
+
+    // Reset EOF
+    pck_file.clear();
+
+    std::cout << "Found " << banks.size() << " BNK files, " << streams.size() << " streamed WEM files and " << externals.size() << " external WEM files\n";
+
+    if (banks.empty() && streams.empty() && externals.empty())
+    {
+        std::cout << "No files discovered to be extracted\n";
+        return EXIT_SUCCESS;
+    }
+
+    auto output_directory = pck_filename.parent_path();
+
+    if (!options.no_directory)
+    {
+        output_directory = CreateOutputDirectory(pck_filename);
+    }
+
+    // The same ID can exist once per language, as such they can't share a directory
+    auto used_languages = std::set<std::uint32_t>{};
+    for (const auto* entries : { &banks, &streams, &externals })
+    {
+        for (const auto& entry : *entries)
+        {
+            used_languages.insert(entry.language_id);
+        }
+    }
+
+    const auto language_name = [&](const std::uint32_t id)
+    {
+        const auto language = languages.find(id);
+        return language != languages.end() && !language->second.empty() ? language->second : std::to_string(id);
+    };
+
+    auto list_file = std::fstream{};
+
+    if (options.dump_objects)
+    {
+        auto list_filename = output_directory;
+        list_filename = list_filename.append("files.txt");
+        list_file.open(list_filename, std::ios::out | std::ios::binary);
+
+        if (!list_file.is_open())
+        {
+            std::cout << "Unable to write files list '" << list_filename.u8string() << "'\n";
+            return EXIT_FAILURE;
+        }
+
+        std::cout << "Files list was written to: " << list_filename.u8string() << "\n";
+    }
+
+    std::cout << "Start extracting...\n";
+
+    const auto package_size = file_size(pck_filename);
+    const auto extract = [&](const std::vector<PackageEntry>& entries, const std::string& type, const std::string& extension)
+    {
+        for (const auto& entry : entries)
+        {
+            const auto offset = std::uint64_t{ entry.start_block } * std::max(entry.block_size, 1U);
+
+            if (list_file.is_open())
+            {
+                list_file << type << " ID: " << entry.id << "\n";
+                list_file << "\tLanguage: " << language_name(entry.language_id) << "\n";
+                list_file << "\tOffset: " << offset << "\n";
+                list_file << "\tSize: " << entry.size << "\n";
+            }
+
+            if (offset + entry.size > package_size)
+            {
+                std::cout << "Skipping " << entry.id << ", it points outside of the package\n";
+                continue;
+            }
+
+            auto filename = output_directory;
+
+            if (used_languages.size() > 1U)
+            {
+                filename = filename.append(language_name(entry.language_id));
+                create_directories(filename);
+            }
+
+            filename = filename.append(std::to_string(entry.id) + extension);
+
+            if (!CopyContent(pck_file, offset, entry.size, filename))
+            {
+                std::cout << "Unable to write file '" << filename.u8string() << "'\n";
+                pck_file.clear();
+                continue;
+            }
+
+            if (extension == ".bnk")
+            {
+                // Embedded sound banks get extracted as well, always into their own directory
+                auto bnk_file = std::fstream{ filename, std::ios::binary | std::ios::in };
+                ExtractBank(filename, bnk_file, Options{ swap_byte_order, false, options.dump_objects });
+            }
+        }
+    };
+
+    extract(banks, "Bank", ".bnk");
+    extract(streams, "Stream", ".wem");
+    extract(externals, "External", ".wem");
+
+    std::cout << "Files were extracted to: " << output_directory.u8string() << "\n";
+    return EXIT_SUCCESS;
+}
+
+int Run(const std::vector<std::filesystem::path>& arguments)
+{
+    std::cout << "Wwise *.BNK / *.PCK File Extractor\n";
+    std::cout << "(c) RAWR 2015-2026 - https://rawr4firefall.com\n\n";
+
+    // Has no argument(s)
+    if (arguments.size() < 2)
+    {
+        std::cout << "Usage: bnkextr filename.bnk|filename.pck [/swap] [/nodir] [/obj]\n";
+        std::cout << "\t/swap - swap byte order (use it for unpacking 'Army of Two')\n";
+        std::cout << "\t/nodir - create no additional directory for the extracted files\n";
+        std::cout << "\t/obj - generate an objects.txt (BNK) or files.txt (PCK) file with the extracted data\n";
+        return EXIT_SUCCESS;
+    }
+
+    const auto& filename = arguments[1];
+    const auto options = Options{
+        HasArgument(arguments, "/swap"),
+        HasArgument(arguments, "/nodir"),
+        HasArgument(arguments, "/obj")
+    };
+
+    auto file = std::fstream{ filename, std::ios::binary | std::ios::in };
+
+    // Could not open input file
+    if (!file.is_open())
+    {
+        std::cout << "Can't open input file: " << filename.u8string() << "\n";
+        return EXIT_FAILURE;
+    }
+
+    // The signature decides the format, not the file extension
+    char sign[4] = {};
+    file.read(sign, sizeof(sign));
+    file.clear();
+    file.seekg(0);
+
+    if (Compare(sign, "AKPK"))
+    {
+        return ExtractPackage(filename, file, options);
+    }
+
+    return ExtractBank(filename, file, options);
 }
 
 // Windows only passes Unicode arguments through the wide entry point

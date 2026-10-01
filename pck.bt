@@ -1,0 +1,60 @@
+struct LANGUAGES
+{
+    uint count;
+    struct LANGUAGE
+    {
+        uint nameOffset; // From the start of this table
+        uint id;
+    } language[count];
+    byte names[languagesLength - 4 - count * sizeof(LANGUAGE)]; // Usually UTF-16
+};
+
+struct FILE_ENTRY
+{
+    uint id;
+    uint blockSize;
+    uint length;
+    uint startBlock; // Offset in the file = startBlock * blockSize
+    uint languageId;
+};
+
+struct EXTERNAL_ENTRY
+{
+    uint64 id;
+    uint blockSize;
+    uint length;
+    uint startBlock; // Offset in the file = startBlock * blockSize
+    uint languageId;
+};
+
+struct FILE_TABLE
+{
+    uint count;
+    if(count > 0)
+        FILE_ENTRY entry[count];
+};
+
+struct EXTERNAL_TABLE
+{
+    uint count;
+    if(count > 0)
+        EXTERNAL_ENTRY entry[count];
+};
+
+char magic[4]; // AKPK
+uint headerLength;
+uint version;
+uint languagesLength;
+uint banksLength;
+uint streamsLength;
+
+// Older packages don't have a table for external files
+local int hasExternals = headerLength != languagesLength + banksLength + streamsLength + 16;
+if(hasExternals)
+    uint externalsLength;
+
+LANGUAGES languages;
+FILE_TABLE banks;   // Embedded *.bnk files
+FILE_TABLE streams; // Streamed *.wem files
+if(hasExternals)
+    EXTERNAL_TABLE externals; // External *.wem files
