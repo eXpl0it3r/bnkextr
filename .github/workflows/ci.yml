@@ -2,29 +2,41 @@ name: CI
 
 on: [push, pull_request, workflow_dispatch]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
-    name: ${{ matrix.platform.name }} ${{ matrix.config.name }}
+    name: ${{ matrix.platform.name }}
     runs-on: ${{ matrix.platform.os }}
 
     strategy:
       fail-fast: false
       matrix:
         platform:
-        - { name: Windows VS2019, os: windows-2019 }
-        - { name: Windows VS2022, os: windows-2022 }
-        - { name: Linux GCC,      os: ubuntu-24.04 }
-        - { name: Linux Clang,    os: ubuntu-24.04, flags: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ }
-        - { name: MacOS XCode,    os: macos-14 }
+        - { name: Windows VS2026, os: windows-2025 }
+        - { name: Linux GCC,      os: ubuntu-26.04 }
+        - { name: Linux Clang,    os: ubuntu-26.04, flags: -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ }
+        - { name: macOS Xcode,    os: macos-26 }
 
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
 
     - name: Configure CMake
-      shell: bash
-      run: cmake -S $GITHUB_WORKSPACE -B $GITHUB_WORKSPACE/build -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install -DCMAKE_VERBOSE_MAKEFILE=ON ${{matrix.platform.flags}}
+      env:
+        CMAKE_FLAGS: ${{ matrix.platform.flags }}
+      run: cmake -S "$GITHUB_WORKSPACE" -B "$GITHUB_WORKSPACE/build" -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/install" -DCMAKE_VERBOSE_MAKEFILE=ON $CMAKE_FLAGS
 
     - name: Build
-      shell: bash
-      run: cmake --build $GITHUB_WORKSPACE/build --config Release --target install
+      run: cmake --build "$GITHUB_WORKSPACE/build" --config Release --target install
