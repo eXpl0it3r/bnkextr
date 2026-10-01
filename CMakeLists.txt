@@ -18,6 +18,11 @@ elseif((CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL 
 	target_link_options(${PROJECT_NAME} PRIVATE -static)
 endif()
 
+# MinGW needs to be told to use wmain
+if(MINGW)
+	target_link_options(${PROJECT_NAME} PRIVATE -municode)
+endif()
+
 # Install executable
 install(TARGETS ${PROJECT_NAME}
 		RUNTIME DESTINATION .)

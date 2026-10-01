@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -158,26 +159,18 @@ bool Compare(char* char_string, const std::string& string)
     return std::strncmp(char_string, string.c_str(), string.length()) == 0;
 }
 
-bool HasArgument(char* arguments[], const int argument_count, const std::string& argument)
+bool HasArgument(const std::vector<std::filesystem::path>& arguments, const std::filesystem::path& argument)
 {
-    for (auto i = 0U; i < static_cast<std::size_t>(argument_count); ++i)
-    {
-        if (Compare(arguments[i], argument))
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return std::find(arguments.begin(), arguments.end(), argument) != arguments.end();
 }
 
-int main(int argument_count, char* arguments[])
+int Run(const std::vector<std::filesystem::path>& arguments)
 {
     std::cout << "Wwise *.BNK File Extractor\n";
     std::cout << "(c) RAWR 2015-2022 - https://rawr4firefall.com\n\n";
 
     // Has no argument(s)
-    if (argument_count < 2)
+    if (arguments.size() < 2)
     {
         std::cout << "Usage: bnkextr filename.bnk [/swap] [/nodir] [/obj]\n";
         std::cout << "\t/swap - swap byte order (use it for unpacking 'Army of Two')\n";
@@ -186,17 +179,17 @@ int main(int argument_count, char* arguments[])
         return EXIT_SUCCESS;
     }
 
-    auto bnk_filename = std::filesystem::path{ std::string{ arguments[1] } };
-    auto swap_byte_order = HasArgument(arguments, argument_count, "/swap");
-    auto no_directory = HasArgument(arguments, argument_count, "/nodir");
-    auto dump_objects = HasArgument(arguments, argument_count, "/obj");
+    auto bnk_filename = arguments[1];
+    auto swap_byte_order = HasArgument(arguments, "/swap");
+    auto no_directory = HasArgument(arguments, "/nodir");
+    auto dump_objects = HasArgument(arguments, "/obj");
 
     auto bnk_file = std::fstream{ bnk_filename, std::ios::binary | std::ios::in };
 
     // Could not open BNK file
     if (!bnk_file.is_open())
     {
-        std::cout << "Can't open input file: " << bnk_filename << "\n";
+        std::cout << "Can't open input file: " << bnk_filename.u8string() << "\n";
         return EXIT_FAILURE;
     }
 
@@ -337,7 +330,7 @@ int main(int argument_count, char* arguments[])
 
         if (!object_file.is_open())
         {
-            std::cout << "Unable to write objects file '" << object_filename.string() << "'\n";
+            std::cout << "Unable to write objects file '" << object_filename.u8string() << "'\n";
             return EXIT_FAILURE;
         }
 
@@ -374,7 +367,7 @@ int main(int argument_count, char* arguments[])
             }
         }
 
-        std::cout << "Objects file was written to: " << object_filename.string() << "\n";
+        std::cout << "Objects file was written to: " << object_filename.u8string() << "\n";
     }
 
     // Extract WEM files
@@ -401,7 +394,7 @@ int main(int argument_count, char* arguments[])
 
         if (!wem_file.is_open())
         {
-            std::cout << "Unable to write file '" << wem_filename.string() << "'\n";
+            std::cout << "Unable to write file '" << wem_filename.u8string() << "'\n";
             continue;
         }
 
@@ -412,5 +405,16 @@ int main(int argument_count, char* arguments[])
         wem_file.write(data.data(), size);
     }
 
-    std::cout << "Files were extracted to: " << output_directory.string() << "\n";
+    std::cout << "Files were extracted to: " << output_directory.u8string() << "\n";
+    return EXIT_SUCCESS;
+}
+
+// Windows only passes Unicode arguments through the wide entry point
+#ifdef _WIN32
+int wmain(int argument_count, wchar_t* arguments[])
+#else
+int main(int argument_count, char* arguments[])
+#endif
+{
+    return Run(std::vector<std::filesystem::path>(arguments, arguments + argument_count));
 }
